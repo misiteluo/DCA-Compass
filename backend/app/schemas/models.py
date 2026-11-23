@@ -21,6 +21,7 @@ class AssetSummary(BaseModel):
     multiplier: float | None = None
     zone: str | None = None
     action: str | None = None
+    source: dict | None = None
 
 
 class HealthResponse(BaseModel):

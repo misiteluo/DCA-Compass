@@ -21,6 +21,7 @@ export default function Nav() {
         </NavLink>
       ))}
       <NavLink to="/manual" className="link">三资产手册</NavLink>
+      <NavLink to="/admin" className="link">后台管理</NavLink>
     </nav>
   );
 }

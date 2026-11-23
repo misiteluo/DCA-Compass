@@ -5,13 +5,22 @@ export function EChart({ option, height = 300 }: { option: echarts.EChartsOption
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!ref.current) return;
-    const chart = echarts.init(ref.current, "dark");
-    chart.setOption({ backgroundColor: "transparent", ...option });
-    const onResize = () => chart.resize();
-    window.addEventListener("resize", onResize);
+    const container = ref.current;
+    let chart: echarts.ECharts | null = null;
+    const resize = () => {
+      if (!container.clientWidth || !container.clientHeight) return;
+      if (!chart) {
+        chart = echarts.init(container, "dark");
+        chart.setOption({ backgroundColor: "transparent", ...option });
+      }
+      chart.resize();
+    };
+    const observer = new ResizeObserver(resize);
+    observer.observe(container);
+    resize();
     return () => {
-      window.removeEventListener("resize", onResize);
-      chart.dispose();
+      observer.disconnect();
+      chart?.dispose();
     };
   }, [JSON.stringify(option)]);
   return <div ref={ref} style={{ width: "100%", height }} />;

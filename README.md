@@ -1,86 +1,101 @@
 # 定投罗盘 · DCA Compass
 
-五资产智能定投评分站：每天给 BTC / 黄金 / 纳斯达克100 / 标普500 / 沪深300 算一个
-0–100 的估值综合分，并按各资产自己的映射表换算成本周定投倍数，附 2015 年至今的
-回测（策略定投 vs 普通定投 vs 买入持有）、QDII 美股基金清单与懒人组合回测。
+五资产定投信号、历史评分、基金筛选与持仓、十大懒人组合。
+参考站：[btcdca.me](https://btcdca.me/)。前端保留本项目的 React / ECharts 布局。
 
-功能结构对标 btcdca.me（页面、区块顺序、维度与权重、倍数映射），全部代码与文案为
-原创实现；视觉主题为本站自有设计。
+## 当前实现与边界
 
-## 架构
+这次将页面实际使用的数据链路改为参考站公开接口兼容模式，修正原先“用通用百分位算法
+替代原站评分”的差异。五资产评分、定投倍数、风控状态与历史记录保留公开接口结果；
+基金、组合及固定回测报告保留参考站公布的字段与口径。
 
-```
-            ┌──────────── frontend (React + Vite + TS + ECharts) ───────────┐
-  浏览器 ──▶ │  pages: Home / AssetPage / Funds / Lazy / Portfolio / Manual   │
-            │  components: Nav / TickerTape / Gauge / Radar / Heatmap / ...  │
-            └──────────────────────────┬─────────────────────────────────────┘
-                                       │ REST  /api/v1/*
-            ┌──────────────────────────▼─────────────────────────────────────┐
-            │ backend (FastAPI, 分层)                                     │
-            │  api/routes ─▶ cache (每日文件缓存) ─▶ services             │
-            │    ├─ providers/  Yahoo · CoinMetrics · alternative.me      │
-            │    │              FRED · 东方财富                            │
-            │    ├─ indicators  RSI/MACD/布林/波动率/百分位（纯函数）      │
-            │    ├─ scoring     维度 → 百分位分 → 加权综合 → 倍数映射      │
-            │    ├─ backtest    周频定投回测（扩张窗口，无未来函数）       │
-            │    ├─ funds       QDII 基金净值统计（东方财富）              │
-            │    └─ portfolios  10 个懒人组合季度再平衡回测                │
-            └─────────────────────────────────────────────────────────────────┘
-```
+**这不是原站私有服务端的独立源码复刻。** 原站未公开服务端评分、数据清洗、平滑、风控
+实现。其在线评分仍依赖 `btcdca.me` 的公开只读接口；网络失败时使用上次成功缓存或随库
+快照，页面明确标注采集时间及状态。不能把断网后的历史快照当作当天信号。
 
-## 运行
+已移植到本地的可观察规则：沪深300 月度 PE/PB/PEG/ROE 估值评分、分段倍数与最低倍数
+限制、策略/普通定投/买入持有现金流；十个组合的年度加权收益和复利增长。固定回测报告
+与当前评分分开显示，保留原站存在的不同版本口径。
 
-后端：
+`/admin/` 在 2026-11-23 采集时返回 502，项目仅展示该不可验证状态，没有虚构后台管理
+功能。完整功能对照与残余差异见 [docs/FEATURE_PARITY.md](docs/FEATURE_PARITY.md)。
 
-```bash
-cd backend
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/uvicorn app.main:app --port 8000     # http://localhost:8000/docs
-.venv/bin/python -m pytest                      # 单元测试
+## 本地运行（Windows PowerShell）
+
+在项目根目录准备依赖：
+
+```powershell
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
+npm.cmd --prefix frontend ci
 ```
 
-前端：
+两个终端分别启动：
 
-```bash
-cd frontend
-npm install
-npm run dev        # http://localhost:5173 （默认连 localhost:8000 的 API）
-npm run build      # 类型检查 + 生产构建
+```powershell
+# 终端一，项目根目录
+.venv/Scripts/python.exe -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
+
+# 终端二，项目根目录
+npm.cmd --prefix frontend run dev
 ```
 
-或一键：`docker compose up --build`（前端 http://localhost:8080 ，nginx 反代 /api）。
+打开 http://localhost:5173 。Vite 将同源 `/api` 请求转发至 `127.0.0.1:8000`。
+也可 `docker compose up --build`，访问 http://localhost:8080 。后端镜像包含离线快照。
 
-首次访问数据接口会抓取全部历史行情并计算（约 2–4 分钟），结果缓存到
-`backend/data/cache/`，每天自动刷新一次。
+Linux/macOS 使用 `.venv/bin/python` 替换 `.venv/Scripts/python.exe`。
 
-## API
+## 数据与刷新
 
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| GET | `/api/v1/health` | 健康检查 |
-| GET | `/api/v1/assets` | 五资产摘要（价格/评分/倍数/区间） |
-| GET | `/api/v1/assets/{id}` | 资产详情：维度、回测全量图表数据、映射表、风控 |
-| GET | `/api/v1/signals/weekly` | 本周定投信号表 |
-| GET | `/api/v1/funds?kind=active\|passive` | QDII 基金列表（主动 23 / 被动 16） |
-| GET | `/api/v1/funds/{code}` | 基金详情（业绩/风险/配置/经理） |
-| GET | `/api/v1/portfolios` | 10 个懒人组合回测摘要 |
-| GET | `/api/v1/portfolios/{id}` | 组合详情（配置/年度回报） |
+- 评分：每个接口缓存 60 秒；前端首页和资产页每 60 秒更新。
+- 基金市场评分、机器人记录：缓存 5 分钟；基金完整目录与历史评分：缓存 1 小时。
+- 十大组合与固定报告：版本化快照，见 `backend/reference/site.json`。
+- 运行时缓存：`backend/data/cache/reference_*.json`，不覆盖原有独立引擎的缓存。
+- 状态：`live` 为最近成功读取；`cached` 为网络失败后沿用本地缓存；`snapshot` 为随库
+  离线快照；`report` 为固定历史报告。所有状态都附来源，时间显示为北京时间。
 
-## 方法论
+仅使用快照运行：在启动后端的终端设置 `$env:REFERENCE_OFFLINE='1'`。
 
-- 每个维度取当前原始值在自身历史中的百分位 → 0–100 分（越便宜/机会越大分越高）；
-  维度数据源不可达时该维度记为 unavailable，剩余维度权重重新归一化到 100%，不编造数据。
-- 倍数映射每资产一张表（BTC 分段线性 0.10–3.00x、黄金阶梯、纳指 0–2.50x、
-  标普 0–2.25x、沪深300 公式 M = 0.2 + (Score − 25) × 0.024），展示与回测共用同一函数。
-- 回测：每周定投基准 100，历史评分由价格派生维度以扩张窗口百分位合成，无未来函数。
-- 数据源（全部免费无 key）：Yahoo Finance、CoinMetrics community、alternative.me、
-  FRED fredgraph、东方财富。各维度的具体来源见资产页与 `docs/FEATURE_PARITY.md`。
+重新采集公开报告、基金和接口数据：
 
-## 目录
+```powershell
+.venv/Scripts/python.exe scripts/sync_reference.py
+```
 
-- `backend/` FastAPI 后端（app/api、app/services、app/schemas、app/core、tests）
-- `frontend/` React 前端（src/pages、src/components、src/api）
-- `docs/FEATURE_PARITY.md` 与原站的功能对标清单（done / partial / unavailable 及原因）
-- `V2_BUILD_REPORT.md` 本次构建与验证报告
+采集器将网页中静态对象解析为数据，不执行下载的 JavaScript，不复制原站统计脚本。
+采集后重启后端以加载新版固定报告。更新快照后应复核测试中的已知数值：这些测试是
+版本化金样，不是会随行情自动变化的断言。
 
-本项目仅为历史数据回测与定投纪律工具，不构成投资建议。
+## 主要 API
+
+| 路径 | 内容 |
+|---|---|
+| `/api/v1/health` | 服务健康状态 |
+| `/api/v1/assets` | 五资产行情、评分、倍数与来源 |
+| `/api/v1/assets/{id}` | 维度、历史、固定报告、纳指十二维、沪深300机器人记录 |
+| `/api/v1/signals/weekly` | 当前信号摘要 |
+| `/api/v1/fund-market-score` | 基金独立四维市场评分，不以纳指评分代替 |
+| `/api/v1/funds?kind=active\|passive` | 主动23只 / 被动16只，含同期基准、超额收益和限额 |
+| `/api/v1/funds/{code}` | 持仓、风险、资产配置、经理与费率 |
+| `/api/v1/portfolios`、`/api/v1/portfolios/{id}` | 十大组合配置、年度回报、风险、压力测试与增长 |
+
+保留 `/asset/:id`、`/funds`、`/manual`；兼容原站 `/btc/`、`/gold/`、`/nasdaq/`、
+`/sp500/`、`/hs300/`、`/us-fund-holdings/`、`/lazy/`、`/touzi/`。
+
+旧 `scoring.py`、`backtest.py`、`funds.py`、`portfolios.py` 和 `cache.py` 中的独立数据引擎
+仍保留，但当前页面 API 已不调用这些旧计算入口，不能用其测试证明原站私有算法等价。
+
+## 验证
+
+```powershell
+.venv/Scripts/python.exe -m pytest backend/tests -q
+npm.cmd --prefix frontend run build
+New-Item -ItemType Directory -Force output/playwright
+npx.cmd --yes --package @playwright/cli playwright-cli -s=dca-parity open http://127.0.0.1:5173 --browser chrome
+npx.cmd --yes --package @playwright/cli playwright-cli -s=dca-parity run-code --filename scripts/verify_ui.js
+```
+
+浏览器脚本覆盖五资产分页、纳指双评分与风控、23/16基金切换、排序、持仓/费率、
+原生弹窗关闭/焦点恢复、组合图表、390px移动端宽度。浏览器验证需要先启动前后端。
+
+本项目用于展示历史数据和策略规则，不执行交易。

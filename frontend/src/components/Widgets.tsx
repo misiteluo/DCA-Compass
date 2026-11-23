@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useEffect, useId, useRef } from "react";
 import type { Dimension } from "../types";
 
 export function ScoreGauge({ score }: { score: number | null }) {
@@ -72,16 +72,32 @@ export function Drawer({ title, onClose, children }: {
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    dialog.showModal();
+    let pressedOutside = false;
+    const outside = (e: PointerEvent) => {
+      const r = dialog.getBoundingClientRect();
+      return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+    };
+    const down = (e: PointerEvent) => { pressedOutside = outside(e); };
+    const up = (e: PointerEvent) => { if (pressedOutside && outside(e)) dialog.close(); };
+    if (!("closedBy" in HTMLDialogElement.prototype)) {
+      dialog.addEventListener("pointerdown", down);
+      dialog.addEventListener("pointerup", up);
+    }
+    return () => { dialog.removeEventListener("pointerdown", down); dialog.removeEventListener("pointerup", up); dialog.close(); };
+  }, []);
   return (
-    <>
-      <div className="drawer-mask" onClick={onClose} />
-      <div className="drawer">
+      <dialog ref={ref} className="drawer" aria-labelledby={titleId} {...{ closedby: "any" }} onClose={() => { if (ref.current?.open) return; if (ref.current) ref.current.returnValue = ""; onClose(); }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0 }}>{title}</h3>
-          <button className="btn" onClick={onClose}>关闭</button>
+          <h3 id={titleId} style={{ margin: 0 }}>{title}</h3>
+          <form method="dialog"><button className="btn" autoFocus>关闭</button></form>
         </div>
         {children}
-      </div>
-    </>
+      </dialog>
   );
 }

@@ -18,14 +18,14 @@ def _load(name: str, builder) -> dict | list:
     with _lock:
         if path.exists():
             try:
-                data = json.loads(path.read_text())
+                data = json.loads(path.read_text(encoding="utf-8"))
                 if data.get("_cached_date") == today:
                     return data["payload"]
             except Exception:
                 pass
         payload = builder()
         path.write_text(json.dumps({"_cached_date": today, "payload": payload},
-                                   ensure_ascii=False))
+                                   ensure_ascii=False), encoding="utf-8")
         return payload
 
 
