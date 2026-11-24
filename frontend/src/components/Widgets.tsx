@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { Dimension } from "../types";
 
 export function ScoreGauge({ score }: { score: number | null }) {
@@ -39,22 +39,30 @@ export function DimensionCard({ d }: { d: Dimension }) {
   );
 }
 
-export function Heatmap({ monthly }: { monthly: Record<string, (number | null)[]> }) {
-  const years = Object.keys(monthly).sort();
+export function Heatmap({ monthly, totals = false }: { monthly: Record<string, (number | null)[]>; totals?: boolean }) {
+  const years = Object.entries(monthly).sort(([a], [b]) => a.localeCompare(b));
+  const months = Array.from({ length: 12 }, (_, i) => i);
+  const averages = months.map((month) => {
+    const available = years.flatMap(([, row]) => row[month] ?? []);
+    return available.length ? available.reduce((sum, value) => sum + value, 0) / available.length : null;
+  });
   const color = (v: number | null) =>
     v == null ? "transparent" : v >= 0 ? `rgba(46,189,133,${Math.min(0.15 + v / 12, 0.9)})` : `rgba(229,72,77,${Math.min(0.15 - v / 12, 0.9)})`;
+  const format = (v: number | null, digits = 1) => v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(digits)}%`;
   return (
-    <div className="heat">
-      <div></div>
-      {Array.from({ length: 12 }, (_, i) => <div key={i} className="muted">{i + 1}月</div>)}
-      {years.map((y) => (
-        <Fragment key={y}>
-          <div className="muted" style={{ textAlign: "right", paddingRight: 6 }}>{y}</div>
-          {monthly[y].map((v, i) => (
-            <div key={`${y}-${i}`} style={{ background: color(v) }}>{v == null ? "" : v.toFixed(1)}</div>
-          ))}
-        </Fragment>
-      ))}
+    <div className="table-scroll" tabIndex={0} role="region" aria-label="月度收益热力图">
+      <table className="heat">
+        <thead><tr><th scope="col">年份</th>{months.map((m) => <th scope="col" key={m}>{m + 1}月</th>)}{totals && <th scope="col">年度</th>}</tr></thead>
+        <tbody>{years.map(([year, values]) => <tr key={year}>
+          <th scope="row">{year}</th>
+          {months.map((month) => {
+            const value = values[month] ?? null;
+            return <td key={month} style={{ background: color(value) }} title={`${year}年${month + 1}月 ${format(value, 2)}`}>{format(value)}</td>;
+          })}
+          {totals && <td>{format(values.reduce<number>((sum, value) => sum + (value ?? 0), 0))}</td>}
+        </tr>)}</tbody>
+        {totals && <tfoot><tr><th scope="row">月均</th>{averages.map((value, i) => <td key={i} style={{ background: color(value) }}>{format(value)}</td>)}<td>—</td></tr></tfoot>}
+      </table>
     </div>
   );
 }

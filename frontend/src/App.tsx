@@ -5,6 +5,7 @@ import Funds from "./pages/Funds";
 import Home from "./pages/Home";
 import { LazyList, PortfolioDetail } from "./pages/Lazy";
 import Manual from "./pages/Manual";
+import DcaRecords from "./pages/DcaRecords";
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/lazy/:id" element={<PortfolioDetail />} />
         <Route path="/manual" element={<Manual />} />
         <Route path="/touzi" element={<Manual />} />
+        <Route path="/dca" element={<DcaRecords />} />
         <Route path="/admin" element={<div className="wrap"><h1>后台管理</h1><p>参考站该入口在采集时返回 HTTP 502，尚未获得可验证的后台功能。</p><p><Link to="/">返回首页</Link></p></div>} />
         <Route path="*" element={<div className="wrap"><h1>页面不存在</h1><Link to="/">返回首页</Link></div>} />
       </Routes>

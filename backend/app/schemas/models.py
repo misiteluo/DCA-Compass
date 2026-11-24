@@ -24,6 +24,12 @@ class AssetSummary(BaseModel):
     source: dict | None = None
 
 
+class MarketOverview(BaseModel):
+    assets: list[AssetSummary]
+    source: dict
+    data_at: str | None = None
+
+
 class HealthResponse(BaseModel):
     status: str
     version: str

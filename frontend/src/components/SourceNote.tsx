@@ -1,9 +1,11 @@
 import type { DataSource } from "../types";
 
-export function formatCapturedAt(value?: string) {
+export function formatCapturedAt(value?: string | null) {
   if (!value) return "--";
   if (value.length === 10) return value;
-  return new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", dateStyle: "short", timeStyle: "medium" }).format(new Date(value));
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", dateStyle: "short", timeStyle: "medium" }).format(date);
 }
 
 export default function SourceNote({ source }: { source?: DataSource }) {

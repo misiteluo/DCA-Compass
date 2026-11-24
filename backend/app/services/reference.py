@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from functools import lru_cache
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -23,7 +24,9 @@ from app.services.portfolios import PORTFOLIOS
 from app.services.reference_rules import hs300_history
 
 REFERENCE_DIR = Path(__file__).resolve().parents[2] / "reference"
+MARKET_ZONES = ((20, "极度高估"), (40, "高估"), (60, "合理"), (80, "低估"), (100, "极度低估"))
 ENDPOINTS = {
+    "markets": "/api/v2/markets",
     **{f"{a}_score": f"/{a}/api/score" for a in ("btc", "gold", "nasdaq", "sp500")},
     "nasdaq_12d": "/nasdaq/api/score-12d",
     "hs300_score": "/hs300/api/hs300/dimensions",
@@ -52,6 +55,16 @@ def _valid_payload(key, payload):
     if not isinstance(payload, dict) or payload.get("success") is not True:
         return False
     data = payload if key == "nasdaq_12d" else payload.get("data")
+    if key == "markets":
+        if not isinstance(data, dict):
+            return False
+        rows = [data[meta["id"]] for meta in ASSETS if meta["id"] in data]
+        return bool(rows) and all(
+            row is None or isinstance(row, dict) and all(
+                type(row.get(field)) in (int, float) and math.isfinite(row[field])
+                for field in ("price", "score", "multiplier")
+            ) for row in rows
+        )
     if key.endswith("_history"):
         return isinstance(data, list) or isinstance(data, dict) and isinstance(data.get("history"), list)
     if key == "hs300_trades":
@@ -182,6 +195,35 @@ def get_market():
     return {"assets": [_asset(m, payload, source) for m, (payload, source) in zip(ASSETS, results)]}
 
 
+def get_market_overview():
+    payload, source = _load("markets", ttl=25)
+    data = payload.get("data", {})
+    data_at = data.get("lastUpdate") or payload.get("timestamp") or payload.get("generatedAt")
+    if isinstance(data_at, (int, float)):
+        try:
+            data_at = datetime.fromtimestamp(data_at / 1000, tz=timezone.utc).isoformat()
+        except (OverflowError, OSError, ValueError):
+            data_at = None
+    if not isinstance(data_at, str):
+        data_at = None
+    assets = []
+    for meta in ASSETS:
+        row = data.get(meta["id"]) or {}
+        score = row.get("score")
+        zone = next((label for limit, label in MARKET_ZONES if score is not None and score <= limit), None)
+        assets.append({
+            **{key: meta[key] for key in ("id", "name", "name_en", "symbol", "currency")},
+            "symbol": row.get("symbol", meta["symbol"]),
+            "status": "ok" if row else "unavailable",
+            "price": row.get("price"), "change_pct": row.get("change24h"),
+            "score": score, "multiplier": row.get("multiplier"),
+            "zone": zone, "action": row.get("strategy") or row.get("status"),
+            "date": (row.get("updatedAt") or data_at) if row else None,
+            "source": source,
+        })
+    return {"assets": assets, "source": source, "data_at": data_at}
+
+
 def get_history(asset):
     if asset == "hs300":
         rows = site_data()["reports"][asset].get("monthlyData", [])
@@ -191,12 +233,36 @@ def get_history(asset):
     rows = data.get("history", []) if isinstance(data, dict) else data
     out = []
     for r in rows:
-        price = next((r[k] for k in ("btcPrice", "gold_price", "qqqPrice", "ndx_price", "spx_price", "sp500Price") if r.get(k) is not None), None)
+        price = next((r[k] for k in ("btcPrice", "gold_price", "ndxPrice", "qqqPrice", "ndx_price", "spxPrice", "spx_price", "sp500Price", "price") if r.get(k) is not None), None)
         out.append({"date": r["date"][:10], "price": price,
                     "score": r.get("totalScore", r.get("total_score")), "multiplier": r.get("multiplier"),
-                    "fgi": r.get("fgi_value", r.get("fearGreed", r.get("fgi"))), "pe": r.get("pe"),
+                    "fgi": r.get("fgi_value", r.get("fearGreed", r.get("fgi"))),
+                    **{field: r.get(field) for field in ("pe", "pb", "rsi")},
+                    "dxy": r.get("dxy_value", r.get("dxy")), "vix": r.get("vix_value", r.get("vix")),
+                    "tips": r.get("tips_yield", r.get("tips")),
                     "event": r.get("eventType", r.get("event_type", ""))})
     return sorted(out, key=lambda r: r["date"]), source
+
+
+def _detail_recommendation(asset, raw):
+    score, multiplier = raw["totalScore"], raw["multiplier"]
+    if asset == "btc":
+        zone = next(text for limit, text in ((85, "极度低估"), (70, "偏低估"), (50, "合理估值"),
+                                             (30, "偏高估"), (-float("inf"), "极度高估")) if score >= limit)
+        action = "增配" if multiplier >= 1.5 else "标配" if multiplier >= 1 else "低配"
+        return zone, f"当前综合评分 {score:g} 分，市场处于{zone}区间。建议今日定投 {multiplier:g}x（{action}）。"
+    if asset == "gold":
+        zone = next((text for limit, text in ((85, "极度低估"), (70, "低估"), (55, "合理估值"),
+                                              (45, "轻微高估"), (30, "高估")) if score >= limit), "极度高估")
+        action = next((text for limit, text in ((2.5, "大幅加仓"), (1.5, "适当加仓"), (1, "标准定投"),
+                                                (.7, "保守参与")) if multiplier >= limit), "减少投入")
+        return raw.get("marketStatus", {}).get("level", zone), f"当前综合评分 {score:g} 分，市场处于{zone}区间。建议今日定投操作 {multiplier:.2f}x（{action}）。"
+    extreme, low = (85, 70) if asset == "nasdaq" else (80, 65)
+    zone = next((text for limit, text in ((extreme, "极度低估"), (low, "低估"), (50, "合理估值"),
+                                         (35, "轻微高估")) if score >= limit), "极度高估")
+    action = next((text for limit, text in ((2, "重仓投入"), (1.5, "增持"), (1, "标准定投"),
+                                           (.5, "保守定投")) if multiplier >= limit), "暂停定投")
+    return raw.get("eventType") or raw.get("status") or zone, f"当前综合评分 {score:g} 分，市场处于{zone}区间。建议今日定投 {multiplier:g}x（{action}）。"
 
 
 def get_asset(asset):
@@ -211,6 +277,15 @@ def get_asset(asset):
         extra = {"score": raw.get("score"), "multiplier": raw.get("multiplier"), "source": src,
                  "dimensions": _dimensions(raw.get("dimensions", {}), raw.get("weights", {}), names)}
     detail = _asset(meta, payload, source, extra)
+    raw = payload.get("data", {})
+    if raw and asset != "hs300":
+        detail["zone"], detail["action"] = _detail_recommendation(asset, raw)
+    indicators = raw.get("indicators", {})
+    if asset in ("nasdaq", "sp500"):
+        detail.update(valuation={k: indicators.get("valuation", {}).get(k) for k in ("pe", "pb")})
+    if asset == "sp500":
+        detail["summary_indicators"] = _dimensions(
+            indicators, {}, {"valuation": "估值维度", "technical": "技术维度", "macro": "宏观维度", "sentiment": "情绪维度"})
     history, history_source = get_history(asset)
     detail.update(history=history, history_source=history_source, report=site_data()["reports"][asset])
     if asset == "hs300":
@@ -294,13 +369,17 @@ def get_portfolios():
     ids = [m["id"] for m in PORTFOLIOS]
     out = []
     for id_, p in zip(ids, site_data()["portfolios"]):
-        allocation = {re.search(r'\(([^)]+)\)', a["n"])[1]: a["p"] for a in p["alloc"]}
+        holdings = [(re.search(r'\(([^)]+)\)', a["n"])[1], a) for a in p["alloc"]]
+        allocation = {ticker: a["p"] for ticker, a in holdings}
+        risk_level = 1 + sum(p["vol"] >= threshold for threshold in (8, 10, 12, 14))
         value, growth = 10000, []
         for year, ret in zip(range(2017, 2026), p["annual"]):
             value *= 1 + ret / 100
             growth.append({"date": str(year), "value": int(value + 0.5)})
         out.append({"id": id_, "name": p["name"], "name_en": p["nameEn"], "risk": "低" if p["vol"] < 10 else "中" if p["vol"] < 14 else "高",
-                    "allocation": allocation, "status": "ok", "annualized_pct": p["cagr"], "volatility_pct": p["vol"],
+                    "risk_level": risk_level, "ticker": p["ticker"], "allocation": allocation,
+                    "allocation_labels": {ticker: a["n"] for ticker, a in holdings},
+                    "status": "ok", "annualized_pct": p["cagr"], "volatility_pct": p["vol"],
                     "max_drawdown_pct": p["mdd"], "sharpe": p["sharpe"], "sortino": p["sortino"],
                     "beta": p["beta"], "alpha": p["alpha"], "r2": p["r2"], "best": p["best"], "worst": p["worst"],
                     "founder": p["founder"], "note": p["desc"], "philosophy": p["philosophy"], "period": "2017–2025",

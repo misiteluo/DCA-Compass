@@ -52,13 +52,13 @@ tr.clickable { cursor: pointer; } tr.clickable:hover { background: var(--panel2)
 .btn { background: var(--panel2); color: var(--text); border: 1px solid var(--border);
   border-radius: 8px; padding: 6px 14px; cursor: pointer; }
 .btn.on { background: var(--accent); color: #111; font-weight: 700; }
-.heat { display: grid; grid-template-columns: 52px repeat(12, 1fr); gap: 3px; font-size: 11px; }
-.heat div { padding: 5px 2px; text-align: center; border-radius: 4px; }
+.heat { border-collapse: separate; border-spacing: 3px; font-size: 11px; }
+.heat td, .heat th { padding: 5px; border: 0; text-align: center; border-radius: 4px; white-space: nowrap; }
+.heat th[scope="row"] { position: sticky; inset-inline-start: 0; background: var(--panel); }
 footer { border-top: 1px solid var(--border); padding: 22px 16px; color: var(--muted);
   font-size: 13px; margin-top: 40px; }
 article.manual { line-height: 1.9; }
 article.manual h2 { margin-top: 30px; }
-article.manual table { display: block; overflow-x: auto; }
 .kv { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed var(--border); font-size: 14px; }
 .asset-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; }
 .asset-head h1 { margin-top: 0; }
@@ -72,7 +72,8 @@ article.manual table { display: block; overflow-x: auto; }
 .table-scroll .heat { min-width: 680px; }
 .sort-button { color: inherit; font: inherit; cursor: pointer; background: none; border: 0; padding: 4px; text-align: inherit; }
 .btn:disabled { opacity: .45; cursor: default; }
-button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+button:focus-visible, a:focus-visible, summary:focus-visible, .table-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+#robot-trades { scroll-margin-top: 125px; }
 .report-text { line-height: 1.9; white-space: pre-wrap; }
 .dimension-details { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; color: var(--muted); }
 details { margin-top: 10px; }

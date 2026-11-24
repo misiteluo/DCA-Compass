@@ -1,12 +1,17 @@
 from fastapi import APIRouter, HTTPException
 
 from app.services import reference
-from app.schemas.models import AssetSummary
+from app.schemas.models import AssetSummary, MarketOverview
 
 router = APIRouter(tags=["assets"])
 
 _SUMMARY_KEYS = ("id", "name", "name_en", "symbol", "currency", "status",
                  "price", "change_pct", "date", "score", "multiplier", "zone", "action", "source")
+
+
+@router.get("/markets", response_model=MarketOverview)
+def market_overview():
+    return reference.get_market_overview()
 
 
 @router.get("/assets", response_model=list[AssetSummary])

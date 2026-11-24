@@ -22,6 +22,12 @@ export interface DataSource {
   error?: string | null;
 }
 
+export interface MarketOverview {
+  assets: AssetSummary[];
+  source: DataSource;
+  data_at: string | null;
+}
+
 export interface Dimension {
   key: string;
   name: string;
@@ -44,6 +50,8 @@ export interface AssetDetail extends AssetSummary {
   score_change?: number | null;
   risk_control?: { active: boolean; flags: string[] };
   data_quality?: { fresh?: boolean; staleFields?: string[] };
+  valuation?: { pe: number | null; pb: number | null };
+  summary_indicators?: Dimension[];
   history: HistoryRow[];
   history_source: DataSource;
   secondary?: { score: number; multiplier: number; dimensions: Dimension[]; source: DataSource } | null;
@@ -59,6 +67,10 @@ export interface HistoryRow {
   multiplier: number | null;
   pe?: number | null;
   pb?: number | null;
+  rsi?: number | null;
+  dxy?: number | null;
+  vix?: number | null;
+  tips?: number | null;
   fgi?: number | null;
   event?: string;
   amount?: number;
@@ -87,6 +99,8 @@ export interface AssetReport {
   strategy: string[];
   narrative: string[];
   years?: string[];
+  comparison_years?: string[];
+  yearly_highlights?: string[];
   returns?: number[];
   strategyReturns?: number[];
   dcaReturns?: number[];
@@ -100,10 +114,12 @@ export interface AssetReport {
   dates?: string[];
   drawdowns?: number[];
   monthlyData?: number[][] | { date: string; price: number; pe: number; pb: number; event: string }[];
+  monthly_heatmap?: Record<string, (number | null)[]>;
   bins?: string[];
   counts?: number[];
   capital_invested?: number[];
   capital_profit?: number[];
+  total_returns?: number[];
   risk_return?: { name: string; drawdown: number; return_pct: number }[];
 }
 
@@ -152,7 +168,10 @@ export interface Portfolio {
   id: string;
   name: string;
   risk: string;
+  risk_level: number;
+  ticker: string;
   allocation: Record<string, number>;
+  allocation_labels: Record<string, string>;
   status: string;
   annualized_pct: number | null;
   volatility_pct: number | null;

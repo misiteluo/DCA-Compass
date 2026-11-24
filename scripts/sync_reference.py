@@ -19,6 +19,7 @@ DEST = ROOT / "backend" / "reference"
 ASSETS = ("btc", "gold", "nasdaq", "sp500", "hs300")
 ENDPOINTS = {f"{a}_score": f"/{a}/api/score" for a in ASSETS[:4]}
 ENDPOINTS.update({
+    "markets": "/api/v2/markets",
     "nasdaq_12d": "/nasdaq/api/score-12d",
     "hs300_score": "/hs300/api/hs300/dimensions",
     "hs300_spot": "/hs300/api/hs300/spot",
@@ -136,7 +137,10 @@ def report(html):
             before = siblings[:siblings.index(node)]
             node = node.parent
         tables.append({"title": before[-1].text()[:160] if before else "数据明细", "rows": rows})
-    metrics = [n.text() for n in dom.find(lambda n: bool({"d-mrow", "d-metric"} & set(n.attrs.get("class", "").split())))]
+    def is_metric(n):
+        return bool({"d-mrow", "d-metric"} & set(n.attrs.get("class", "").split()))
+
+    metrics = [n.text() for n in dom.find(is_metric) if not n.find(is_metric)]
     # Preserve strategy instructions as content, without importing the reference HTML or scripts.
     strategy = []
     for heading in dom.find(lambda n: n.tag == "h2"):
@@ -149,7 +153,52 @@ def report(html):
                 strategy.extend(b.text() for b in blocks if b.text())
     narrative = [n.text() for n in dom.find(lambda n: "d-panel" in n.attrs.get("class", "").split())
                  if not n.find(lambda c: c.tag == "table")]
-    return {"tables": tables, "metrics": metrics, "strategy": strategy, "narrative": narrative}
+    result = {"tables": tables, "metrics": metrics, "strategy": strategy, "narrative": narrative}
+    yearly_highlights = []
+    for n in dom.find(lambda n: n.tag in ("div", "span") and all(isinstance(c, str) for c in n.children)):
+        label = n.text()
+        if re.fullmatch(r"(?:最佳|最差)年份 · (?:Best Year|Worst Year|\d{4})|正收益年份", label):
+            group = n.parent.parent if re.search(r"\d{4}$", label) else n.parent
+            yearly_highlights.append(group.text())
+    if yearly_highlights:
+        result["yearly_highlights"] = yearly_highlights
+    return result
+
+
+def static_heatmap(html):
+    section = html.split("<!-- 5. 月度热力图 -->", 1)[-1].split("<!-- 6. 风险指标 -->", 1)[0]
+    rows = re.split(r"<!-- (\d{4}) -->", section)[1:]
+    monthly = {}
+    for year, block in zip(rows[::2], rows[1::2]):
+        values = re.findall(r">\s*([-+]\d+(?:\.\d+)?)%\s*</div>", block)
+        if len(values) == 12:
+            monthly[year] = [float(value) for value in values]
+    return monthly
+
+
+def asset_report(asset, html):
+    r = report(html)
+    scatter = re.findall(r"label:\s*['\"]([^'\"]+)['\"],\s*data:\s*\[\{\s*x:\s*([-\d.]+),\s*y:\s*([-\d.]+)\s*\}\]", html)
+    r["risk_return"] = [{"name": name, "drawdown": float(x), "return_pct": float(y)} for name, x, y in scatter]
+    for label, key in (("总投入", "capital_invested"), ("累计收益", "capital_profit"), ("总回报率 (%)", "total_returns")):
+        match = re.search(r"label:\s*['\"]" + re.escape(label) + r"['\"],\s*data:\s*(\[[^\]]+\])", html)
+        if match:
+            r[key] = Literal(match[1]).value()
+    for name in ("years", "returns", "strategyReturns", "dcaReturns", "standardReturns", "bhReturns", "buyholdReturns",
+                 "growthLabels", "strategyValue", "standardValue", "bhValue", "dates", "drawdowns", "monthlyData", "bins",
+                 "counts", "DIM12_CONFIG", "bullBearNodes"):
+        try:
+            value = constant(html, name)
+        except ValueError:
+            continue
+        if value is not None:
+            r[name] = value
+    if asset == "nasdaq":
+        comparison = html.split("function initNasdaqAnnualReturnsChart()", 1)[-1]
+        r["comparison_years"] = constant(comparison, "years")
+    if asset == "sp500":
+        r["monthly_heatmap"] = static_heatmap(html)
+    return r
 
 
 def extract(pages):
@@ -164,22 +213,7 @@ def extract(pages):
     data = {"captured_at": datetime.now(timezone.utc).isoformat(), "funds": funds, "portfolios": portfolios,
             "portfolio_stress": constant(lazy, "DD"), "reports": {}}
     for asset in ASSETS:
-        html = pages[asset]
-        r = report(html)
-        scatter = re.findall(r"label:\s*['\"]([^'\"]+)['\"],\s*data:\s*\[\{\s*x:\s*([-\d.]+),\s*y:\s*([-\d.]+)\s*\}\]", html)
-        r["risk_return"] = [{"name": name, "drawdown": float(x), "return_pct": float(y)} for name, x, y in scatter]
-        for label, key in (("总投入", "capital_invested"), ("累计收益", "capital_profit")):
-            match = re.search(r"label:\s*['\"]" + label + r"['\"],\s*data:\s*(\[[^\]]+\])", html)
-            if match:
-                r[key] = Literal(match[1]).value()
-        for name in ("years", "returns", "strategyReturns", "dcaReturns", "standardReturns", "bhReturns", "buyholdReturns", "growthLabels", "strategyValue", "standardValue", "bhValue", "dates", "drawdowns", "monthlyData", "bins", "counts", "DIM12_CONFIG", "bullBearNodes"):
-            try:
-                value = constant(html, name)
-            except ValueError:
-                continue
-            if value is not None:
-                r[name] = value
-        data["reports"][asset] = r
+        data["reports"][asset] = asset_report(asset, pages[asset])
     return data
 
 

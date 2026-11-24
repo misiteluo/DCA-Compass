@@ -5,9 +5,8 @@
 
 ## 当前实现与边界
 
-这次将页面实际使用的数据链路改为参考站公开接口兼容模式，修正原先“用通用百分位算法
-替代原站评分”的差异。五资产评分、定投倍数、风控状态与历史记录保留公开接口结果；
-基金、组合及固定回测报告保留参考站公布的字段与口径。
+首页使用原站的聚合行情接口 `GET /api/v2/markets`。资产详情使用各自的评分接口，
+分别保留综合分、定投倍数、风控与历史记录。基金、组合及固定回测报告按各自的公开口径展示。
 
 **这不是原站私有服务端的独立源码复刻。** 原站未公开服务端评分、数据清洗、平滑、风控
 实现。其在线评分仍依赖 `btcdca.me` 的公开只读接口；网络失败时使用上次成功缓存或随库
@@ -18,7 +17,8 @@
 与当前评分分开显示，保留原站存在的不同版本口径。
 
 `/admin/` 在 2026-11-23 采集时返回 502，项目仅展示该不可验证状态，没有虚构后台管理
-功能。完整功能对照与残余差异见 [docs/FEATURE_PARITY.md](docs/FEATURE_PARITY.md)。
+功能。原站 `/dca/` 处于开发中，页面依赖访问者本机的服务。本地提供计划预览与公开沪深300
+机器人记录入口。完整功能对照与残余差异见 [docs/FEATURE_PARITY.md](docs/FEATURE_PARITY.md)。
 
 ## 本地运行（Windows PowerShell）
 
@@ -47,14 +47,14 @@ Linux/macOS 使用 `.venv/bin/python` 替换 `.venv/Scripts/python.exe`。
 
 ## 数据与刷新
 
-- 评分：每个接口缓存 60 秒；前端首页和资产页每 60 秒更新。
+- 首页聚合行情约每 30 秒刷新，后端缓存 25 秒；资产评分单独缓存 60 秒。
 - 基金市场评分、机器人记录：缓存 5 分钟；基金完整目录与历史评分：缓存 1 小时。
 - 十大组合与固定报告：版本化快照，见 `backend/reference/site.json`。
 - 运行时缓存：`backend/data/cache/reference_*.json`，不覆盖原有独立引擎的缓存。
 - 状态：`live` 为最近成功读取；`cached` 为网络失败后沿用本地缓存；`snapshot` 为随库
   离线快照；`report` 为固定历史报告。所有状态都附来源，时间显示为北京时间。
 
-仅使用快照运行：在启动后端的终端设置 `$env:REFERENCE_OFFLINE='1'`。
+离线运行时，在启动后端的终端设置 `$env:REFERENCE_OFFLINE='1'`。数据优先取本地缓存，再取随库快照。
 
 重新采集公开报告、基金和接口数据：
 
@@ -71,6 +71,7 @@ Linux/macOS 使用 `.venv/bin/python` 替换 `.venv/Scripts/python.exe`。
 | 路径 | 内容 |
 |---|---|
 | `/api/v1/health` | 服务健康状态 |
+| `/api/v1/markets` | 首页聚合行情、上游数据时间与来源状态 |
 | `/api/v1/assets` | 五资产行情、评分、倍数与来源 |
 | `/api/v1/assets/{id}` | 维度、历史、固定报告、纳指十二维、沪深300机器人记录 |
 | `/api/v1/signals/weekly` | 当前信号摘要 |
@@ -80,7 +81,7 @@ Linux/macOS 使用 `.venv/bin/python` 替换 `.venv/Scripts/python.exe`。
 | `/api/v1/portfolios`、`/api/v1/portfolios/{id}` | 十大组合配置、年度回报、风险、压力测试与增长 |
 
 保留 `/asset/:id`、`/funds`、`/manual`；兼容原站 `/btc/`、`/gold/`、`/nasdaq/`、
-`/sp500/`、`/hs300/`、`/us-fund-holdings/`、`/lazy/`、`/touzi/`。
+`/sp500/`、`/hs300/`、`/us-fund-holdings/`、`/lazy/`、`/touzi/`、`/dca/`。
 
 旧 `scoring.py`、`backtest.py`、`funds.py`、`portfolios.py` 和 `cache.py` 中的独立数据引擎
 仍保留，但当前页面 API 已不调用这些旧计算入口，不能用其测试证明原站私有算法等价。

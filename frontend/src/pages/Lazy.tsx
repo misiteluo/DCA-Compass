@@ -8,7 +8,10 @@ import type { Portfolio } from "../types";
 export function LazyList() {
   const [list, setList] = useState<Portfolio[]>([]);
   const [error, setError] = useState("");
-  useEffect(() => { api.portfolios().then(setList).catch((e) => setError(String(e))); }, []);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    api.portfolios().then(setList).catch((e) => setError(String(e)));
+  }, []);
   return (
     <div className="wrap">
       <section>
@@ -20,11 +23,12 @@ export function LazyList() {
           {list.map((p, i) => (
             <Link key={p.id} to={`/lazy/${p.id}`} className="card">
               <h3>NO.{String(i + 1).padStart(2, "0")} {p.name}</h3>
+              <p className="muted">{p.ticker.split("·")[0].trim()}</p>
               <div className="kv"><span>年化收益</span><b>{p.annualized_pct ?? "--"}%</b></div>
               <div className="kv"><span>波动率</span><b>{p.volatility_pct ?? "--"}%</b></div>
               <div className="kv"><span>最大回撤</span><b>{p.max_drawdown_pct ?? "--"}%</b></div>
               <div className="kv"><span>夏普比率</span><b>{p.sharpe ?? "--"}</b></div>
-              <div className="kv"><span>风险等级</span><b>{p.risk}</b></div>
+              <div className="kv"><span>风险等级</span><b>{p.risk_level} / 5</b></div>
             </Link>
           ))}
         </div>
@@ -37,19 +41,33 @@ export function PortfolioDetail() {
   const { id = "" } = useParams();
   const [p, setP] = useState<Portfolio | null>(null);
   const [error, setError] = useState("");
-  useEffect(() => { let active = true; setP(null); setError(""); api.portfolio(id).then((d) => { if (active) setP(d); }).catch((e) => { if (active) setError(String(e)); }); return () => { active = false; }; }, [id]);
-  if (!p) return <div className="wrap"><p role="status">{error || "加载中…"}</p></div>;
+  useEffect(() => {
+    let active = true;
+    window.scrollTo(0, 0);
+    setP(null);
+    setError("");
+    api.portfolio(id).then((data) => { if (active) setP(data); })
+      .catch((e) => { if (active) setError(String(e)); });
+    return () => { active = false; };
+  }, [id]);
+  if (!p) return <div className="wrap"><p role={error ? "alert" : "status"}>{error || "加载中…"}</p></div>;
+  const holdings = Object.entries(p.allocation).map(([ticker, value]) => ({ name: p.allocation_labels[ticker], value }));
   return (
     <div className="wrap">
       <p><Link to="/lazy">← 返回所有组合</Link></p>
       <section style={{ marginTop: 8 }}>
         <h2>{p.name}</h2>
         <p>{p.name_en} · {p.founder}</p><p className="muted">{p.philosophy}</p>
+        <p>{p.ticker}</p>
+        <p>{p.note}</p>
         <SourceNote source={p.source} />
         <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))" }}>
           <div className="card">
             <h3>持仓配置</h3>
-            <PieChart data={Object.entries(p.allocation).map(([name, value]) => ({ name, value }))} />
+            <PieChart data={holdings} />
+            <dl>{holdings.map(({ name, value }) => (
+              <div className="kv" key={name}><dt>{name}</dt><dd>{value}%</dd></div>
+            ))}</dl>
           </div>
           <div className="card">
             <h3>回测概览（{p.period}）</h3>
@@ -60,10 +78,11 @@ export function PortfolioDetail() {
             <div className="kv"><span>最大回撤</span><b>{p.max_drawdown_pct}%</b></div>
             <div className="kv"><span>夏普比率</span><b>{p.sharpe}</b></div>
             <div className="kv"><span>索提诺比率</span><b>{p.sortino}</b></div>
-            <div className="kv"><span>Beta / Alpha</span><b>{p.beta} / {p.alpha}%</b></div>
-            <div className="kv"><span>R²</span><b>{p.r2}%</b></div>
+            <div className="kv"><span>Beta（相对 VTI）</span><b>{p.beta?.toFixed(2)}</b></div>
+            <div className="kv"><span>年化 Alpha</span><b>{p.alpha}%</b></div>
+            <div className="kv"><span>R²（相对 VTI）</span><b>{p.r2}%</b></div>
             <div className="kv"><span>最好 / 最差年份</span><b>{p.best}% / {p.worst}%</b></div>
-            <p className="muted">{p.note}</p>
+            <div className="kv"><span>报告标注来源</span><b>Portfolio Visualizer</b></div>
           </div>
         </div>
       </section>
@@ -81,6 +100,7 @@ export function PortfolioDetail() {
         <h2>历史压力测试</h2>
         <table><thead><tr><th>危机事件</th><th>时间</th><th>最大回撤</th></tr></thead><tbody>{p.stress_tests?.map((s) => <tr key={s.name}><td>{s.name}</td><td>{s.s} ~ {s.e}</td><td>{s.d}%</td></tr>)}</tbody></table>
         <p className="muted">风险提示：历史回测不代表未来表现；组合含海外资产，注意汇率与税费差异。</p>
+        <p><Link className="btn" to="/lazy">查看更多组合</Link></p>
       </section>
     </div>
   );
