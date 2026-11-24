@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import { BarChart, LineChart, PieChart } from "../components/Charts";
+import { BarChart, CHART_COLORS, LineChart, PieChart } from "../components/Charts";
 import SourceNote from "../components/SourceNote";
 import type { Portfolio } from "../types";
 
@@ -13,16 +13,16 @@ export function LazyList() {
     api.portfolios().then(setList).catch((e) => setError(String(e)));
   }, []);
   return (
-    <div className="wrap">
+    <main className="wrap">
       <section>
-        <h2>全球十大懒人投资组合</h2>
+        <h1>十大懒人投资组合</h1>
         <p className="muted">2017–2025 年历史报告 · 组合配置、风险指标及年度加权收益按参考站公布口径展示。</p>
         {error && <p role="alert">加载失败：{error}</p>}
         {!error && !list.length && <p role="status">正在加载组合…</p>}
-        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))" }}>
-          {list.map((p, i) => (
+        <div className="grid dimension-grid">
+          {list.map((p) => (
             <Link key={p.id} to={`/lazy/${p.id}`} className="card">
-              <h3>NO.{String(i + 1).padStart(2, "0")} {p.name}</h3>
+              <h3>{p.name}</h3>
               <p className="muted">{p.ticker.split("·")[0].trim()}</p>
               <div className="kv"><span>年化收益</span><b>{p.annualized_pct ?? "--"}%</b></div>
               <div className="kv"><span>波动率</span><b>{p.volatility_pct ?? "--"}%</b></div>
@@ -33,7 +33,7 @@ export function LazyList() {
           ))}
         </div>
       </section>
-    </div>
+    </main>
   );
 }
 
@@ -50,18 +50,18 @@ export function PortfolioDetail() {
       .catch((e) => { if (active) setError(String(e)); });
     return () => { active = false; };
   }, [id]);
-  if (!p) return <div className="wrap"><p role={error ? "alert" : "status"}>{error || "加载中…"}</p></div>;
+  if (!p) return <main className="wrap"><p role={error ? "alert" : "status"}>{error || "加载中…"}</p></main>;
   const holdings = Object.entries(p.allocation).map(([ticker, value]) => ({ name: p.allocation_labels[ticker], value }));
   return (
-    <div className="wrap">
+    <main className="wrap">
       <p><Link to="/lazy">← 返回所有组合</Link></p>
       <section style={{ marginTop: 8 }}>
-        <h2>{p.name}</h2>
+        <h1>{p.name}</h1>
         <p>{p.name_en} · {p.founder}</p><p className="muted">{p.philosophy}</p>
         <p>{p.ticker}</p>
         <p>{p.note}</p>
         <SourceNote source={p.source} />
-        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))" }}>
+        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))" }}>
           <div className="card">
             <h3>持仓配置</h3>
             <PieChart data={holdings} />
@@ -88,9 +88,9 @@ export function PortfolioDetail() {
       </section>
       <section>
         <h2>组合增长（初始 $10,000）</h2>
-        <div className="card"><LineChart dates={p.growth_curve?.map((c) => c.date) ?? []} series={[{ name: p.name, data: p.growth_curve?.map((c) => c.value) ?? [], color: "#f0b90b" }]} /></div>
+        <div className="card"><LineChart dates={p.growth_curve?.map((c) => c.date) ?? []} series={[{ name: p.name, data: p.growth_curve?.map((c) => c.value) ?? [], color: CHART_COLORS.primary }]} /></div>
         <h2>年度回报</h2>
-        <div className="card"><BarChart cats={Object.keys(p.yearly ?? {})} series={[{ name: "年度回报 %", data: Object.values(p.yearly ?? {}), color: "#4c8dff" }]} /></div>
+        <div className="card"><BarChart cats={Object.keys(p.yearly ?? {})} series={[{ name: "年度回报 %", data: Object.values(p.yearly ?? {}), color: CHART_COLORS.comparison }]} /></div>
         <table>
           <thead><tr><th>年份</th><th>回报</th></tr></thead>
           <tbody>{Object.entries(p.yearly ?? {}).map(([y, v]) => (
@@ -102,6 +102,6 @@ export function PortfolioDetail() {
         <p className="muted">风险提示：历史回测不代表未来表现；组合含海外资产，注意汇率与税费差异。</p>
         <p><Link className="btn" to="/lazy">查看更多组合</Link></p>
       </section>
-    </div>
+    </main>
   );
 }

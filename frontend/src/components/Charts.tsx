@@ -1,6 +1,14 @@
 import * as echarts from "echarts";
 import { useEffect, useRef } from "react";
 
+export const CHART_COLORS = {
+  primary: "#fcd535",
+  comparison: "#72a7ff",
+  up: "#0ecb81",
+  down: "#ff6679",
+  muted: "#a3abb7",
+};
+
 export function EChart({ option, height = 300 }: { option: echarts.EChartsOption; height?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -11,7 +19,11 @@ export function EChart({ option, height = 300 }: { option: echarts.EChartsOption
       if (!container.clientWidth || !container.clientHeight) return;
       if (!chart) {
         chart = echarts.init(container, "dark");
-        chart.setOption({ backgroundColor: "transparent", ...option });
+        chart.setOption({
+          backgroundColor: "transparent",
+          animation: !matchMedia("(prefers-reduced-motion: reduce)").matches,
+          ...option,
+        });
       }
       chart.resize();
     };
@@ -26,7 +38,7 @@ export function EChart({ option, height = 300 }: { option: echarts.EChartsOption
   return <div ref={ref} style={{ width: "100%", height }} />;
 }
 
-const AXIS = { axisLabel: { color: "#8b98a9" }, splitLine: { lineStyle: { color: "#232b38" } } };
+const AXIS = { axisLabel: { color: CHART_COLORS.muted }, splitLine: { lineStyle: { color: "#2b3139" } } };
 
 export function RadarChart({ names, scores }: { names: string[]; scores: (number | null)[] }) {
   return (
@@ -34,14 +46,15 @@ export function RadarChart({ names, scores }: { names: string[]; scores: (number
       height={340}
       option={{
         radar: {
+          radius: "48%",
           indicator: names.map((n) => ({ name: n, max: 100 })),
-          axisName: { color: "#c8d2de", fontSize: 11 },
-          splitLine: { lineStyle: { color: "#2b3444" } },
+          axisName: { color: "#eaecef", fontSize: 11 },
+          splitLine: { lineStyle: { color: "#2b3139" } },
           splitArea: { show: false },
         },
         series: [{
           type: "radar",
-          data: [{ value: scores.map((s) => s ?? 0), areaStyle: { opacity: 0.25 }, lineStyle: { color: "#f0b90b" }, itemStyle: { color: "#f0b90b" } }],
+          data: [{ value: scores.map((s) => s ?? 0), areaStyle: { opacity: 0.25 }, lineStyle: { color: CHART_COLORS.primary }, itemStyle: { color: CHART_COLORS.primary } }],
         }],
         tooltip: {},
       }}
@@ -59,7 +72,7 @@ export function LineChart({ dates, series, log = false }: {
       height={320}
       option={{
         tooltip: { trigger: "axis" },
-        legend: { textStyle: { color: "#c8d2de" } },
+        legend: { textStyle: { color: "#eaecef" } },
         xAxis: { type: "category", data: dates, ...AXIS },
         yAxis: { type: log ? "log" : "value", ...AXIS },
         series: series.map((s) => ({
@@ -80,7 +93,7 @@ export function BarChart({ cats, series }: {
       height={300}
       option={{
         tooltip: { trigger: "axis" },
-        legend: { textStyle: { color: "#c8d2de" } },
+        legend: { textStyle: { color: "#eaecef" } },
         xAxis: { type: "category", data: cats, ...AXIS },
         yAxis: { type: "value", ...AXIS },
         series: series.map((s) => ({ name: s.name, type: "bar", data: s.data, itemStyle: { color: s.color } })),
@@ -95,8 +108,8 @@ export function PieChart({ data }: { data: { name: string; value: number }[] }) 
       height={300}
       option={{
         tooltip: {},
-        legend: { textStyle: { color: "#c8d2de" } },
-        series: [{ type: "pie", radius: ["40%", "70%"], data, label: { color: "#e8edf3" } }],
+        legend: { textStyle: { color: "#eaecef" } },
+        series: [{ type: "pie", radius: ["40%", "70%"], data, label: { color: "#eaecef" } }],
       }}
     />
   );

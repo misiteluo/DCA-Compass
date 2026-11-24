@@ -74,11 +74,11 @@ export default function Funds() {
   const listLabel = kind === "active" ? "主动型基金" : "被动型基金";
 
   return (
-    <div className="wrap">
+    <main className="wrap">
       <section>
-        <h2>国内投资美股基金定投推荐（支付宝可买）</h2>
+        <h1>美股基金</h1>
         <div className="card">
-          美股市场定投评分<span className="score" style={{ fontSize: 22 }}> {banner?.score ?? "--"}</span>
+          <h2>美股市场定投评分 <span className="score">{banner?.score ?? "—"}</span></h2>
           {banner?.status && `（${banner.status}）`} · 定投倍数 <b>{banner?.multiplier != null ? `${banner.multiplier.toFixed(2)}x` : "--"}</b>
           <p>{banner?.strategy}</p>
           <div className="kv"><span>参考指数</span><b>纳指100</b></div>
@@ -91,7 +91,7 @@ export default function Funds() {
 
       <section>
         {error && <p role="alert">数据加载失败：{error}</p>}
-        <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+        <div className="toolbar" role="group" aria-label="基金类型">
           <button type="button" aria-pressed={kind === "active"} className={`btn${kind === "active" ? " on" : ""}`} onClick={() => setKind("active")}>主动型</button>
           <button type="button" aria-pressed={kind === "passive"} className={`btn${kind === "passive" ? " on" : ""}`} onClick={() => setKind("passive")}>被动型（纳指100指数）</button>
         </div>
@@ -171,7 +171,7 @@ export default function Funds() {
           </> : <p>暂无费率数据</p>}
         </Drawer>
       )}
-    </div>
+    </main>
   );
 }
 

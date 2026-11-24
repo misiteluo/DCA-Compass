@@ -4,11 +4,11 @@ import type { Dimension } from "../types";
 export function ScoreGauge({ score }: { score: number | null }) {
   const s = score ?? 0;
   return (
-    <div style={{ textAlign: "center" }}>
-      <div style={{ fontSize: 54, fontWeight: 800, color: "var(--accent)", lineHeight: 1 }}>
+    <div className="score-gauge">
+      <div className="gauge-value score">
         {score ?? "--"}
       </div>
-      <div className="bar" style={{ width: 190, margin: "10px auto 4px" }}>
+      <div className="bar">
         <div style={{ width: `${s}%` }} />
       </div>
       <div className="muted">综合评分 / 100</div>
@@ -63,14 +63,6 @@ export function Heatmap({ monthly, totals = false }: { monthly: Record<string, (
         </tr>)}</tbody>
         {totals && <tfoot><tr><th scope="row">月均</th>{averages.map((value, i) => <td key={i} style={{ background: color(value) }}>{format(value)}</td>)}<td>—</td></tr></tfoot>}
       </table>
-    </div>
-  );
-}
-
-export function SignalFeed({ lines }: { lines: string[] }) {
-  return (
-    <div className="term">
-      {lines.map((l, i) => <div key={i}>&gt; {l}</div>)}
     </div>
   );
 }

@@ -13,11 +13,11 @@ async (page) => {
   const home = await (await page.request.get(`${base}/api/v1/markets`)).json();
   await page.clock.install();
   await page.goto(base);
-  const homeCards = page.locator(".cards5 a");
-  await homeCards.first().waitFor();
-  assert(await homeCards.count() === 5, "home: five market cards missing");
+  const marketRows = page.locator(".market-table tbody tr");
+  await marketRows.first().waitFor();
+  assert(await marketRows.count() === 5, "home: five market rows missing");
   const nasdaq = home.assets.find((row) => row.id === "nasdaq");
-  assert(await homeCards.filter({ hasText: "纳斯达克100" }).locator(".score").innerText() === String(nasdaq.score ?? "--"),
+  assert(await marketRows.filter({ hasText: "纳斯达克100" }).locator(".score").innerText() === String(nasdaq.score ?? "--"),
     "home: NASDAQ score differs from aggregate feed");
   let homeRequests = 0;
   await page.route("**/api/v1/markets", async (route) => {
@@ -30,7 +30,7 @@ async (page) => {
   });
   await page.clock.fastForward(30_000);
   await page.getByRole("status").filter({ hasText: "刷新失败" }).waitFor();
-  assert(await homeCards.count() === 5, "home: refresh failure discarded prior data");
+  assert(await marketRows.count() === 5, "home: refresh failure discarded prior data");
   await page.clock.fastForward(30_000);
   await page.getByRole("status").filter({ hasText: "刷新失败" }).waitFor({ state: "hidden" });
   assert(homeRequests === 2, "home: refresh did not recover");
@@ -132,11 +132,24 @@ async (page) => {
     const dimensions = await page.evaluate(() => ({ content: document.documentElement.scrollWidth, viewport: innerWidth }));
     assert(dimensions.content <= dimensions.viewport + 1, `${route}: mobile horizontal overflow ${JSON.stringify(dimensions)}`);
   }
-  checked.push("mobile: 390px, home, asset, funds, portfolio, manual and dca");
+  await page.goto(base);
+  const multiplier = page.locator(".market-multiplier").first();
+  await multiplier.waitFor();
+  assert(await multiplier.evaluate((cell) => cell.getBoundingClientRect().right <= cell.closest(".market-scroll").getBoundingClientRect().right),
+    "mobile: multiplier requires scrolling");
+  const menu = page.getByRole("button", { name: "菜单", exact: true });
+  await menu.click();
+  await page.getByRole("navigation").getByRole("link", { name: "黄金", exact: true }).click();
+  assert(await page.locator("#site-menu").isHidden(), "mobile menu did not close after navigation");
+  await menu.click();
+  assert(await page.locator('#site-menu [aria-current="page"]').innerText() === "黄金", "mobile menu did not mark current page");
+  await page.keyboard.press("Escape");
+  assert(await page.locator("#site-menu").isHidden(), "mobile menu did not close on Escape");
+  checked.push("mobile: 390px, six routes fit viewport, popover navigation and active page");
   assert(!errors.length, `Browser errors: ${errors.join("; ")}`);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`${base}/`);
-  await page.locator(".cards5 a").first().waitFor({ timeout: 40000 });
+  await page.locator(".market-asset").first().waitFor({ timeout: 40000 });
   await page.screenshot({ path: "output/playwright/home-desktop.png", fullPage: true });
   return { checked, pageErrors: errors };
 }

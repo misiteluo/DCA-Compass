@@ -22,12 +22,13 @@ export default function App() {
         <Route path="/manual" element={<Manual />} />
         <Route path="/touzi" element={<Manual />} />
         <Route path="/dca" element={<DcaRecords />} />
-        <Route path="/admin" element={<div className="wrap"><h1>后台管理</h1><p>参考站该入口在采集时返回 HTTP 502，尚未获得可验证的后台功能。</p><p><Link to="/">返回首页</Link></p></div>} />
-        <Route path="*" element={<div className="wrap"><h1>页面不存在</h1><Link to="/">返回首页</Link></div>} />
+        <Route path="/admin" element={<main className="wrap"><h1>后台管理</h1><p>参考站该入口在采集时返回 HTTP 502，尚未获得可验证的后台功能。</p><p><Link to="/">返回首页</Link></p></main>} />
+        <Route path="*" element={<main className="wrap"><h1>页面不存在</h1><Link to="/">返回首页</Link></main>} />
       </Routes>
       <footer>
-        定投罗盘 DCA Compass · 公开数据与历史报告来源：btcdca.me（各页标注采集时间及状态） ·
-        本系统基于历史数据回测，不构成投资建议。
+        <div className="wrap">
+          <strong>定投罗盘</strong> · 行情与历史报告来自 btcdca.me。历史回测不构成投资建议。
+        </div>
       </footer>
     </BrowserRouter>
   );

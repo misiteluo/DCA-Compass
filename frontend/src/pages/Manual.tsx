@@ -22,7 +22,7 @@ function ManualTable({ title, headers, rows, caption = false }: {
 
 export default function Manual() {
   return (
-    <div className="wrap">
+    <main className="wrap">
       <article className="manual">
         <h1>三资产全天候增强策略 · 操作手册</h1>
         <p className="muted">本手册描述一套以纳指、黄金、比特币为核心的三资产配置与执行规则，供执行时逐项核对。内容为策略记录，不构成投资建议。</p>
@@ -130,6 +130,6 @@ export default function Manual() {
         ]} />
         <p className="muted">近12月最大回撤 =（当前总市值 − 过去12个月最高总市值）÷ 过去12个月最高总市值。情景终值按复利估算，未扣通胀和税费。规则来源：参考站 /touzi/，属于策略记录。</p>
       </article>
-    </div>
+    </main>
   );
 }

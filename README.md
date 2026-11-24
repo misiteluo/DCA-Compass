@@ -1,7 +1,7 @@
 # 定投罗盘 · DCA Compass
 
 五资产定投信号、历史评分、基金筛选与持仓、十大懒人组合。
-参考站：[btcdca.me](https://btcdca.me/)。前端保留本项目的 React / ECharts 布局。
+参考站：[btcdca.me](https://btcdca.me/)。界面规范见 [docs/DESIGN.md](docs/DESIGN.md)。
 
 ## 当前实现与边界
 
