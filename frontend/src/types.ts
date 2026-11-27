@@ -121,6 +121,7 @@ export interface AssetReport {
   capital_profit?: number[];
   total_returns?: number[];
   risk_return?: { name: string; drawdown: number; return_pct: number }[];
+  bullBearNodes?: { date: string; type: string; label: string; score: number }[];
 }
 
 export interface Fund {

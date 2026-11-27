@@ -29,6 +29,7 @@ export function LazyList() {
               <div className="kv"><span>最大回撤</span><b>{p.max_drawdown_pct ?? "--"}%</b></div>
               <div className="kv"><span>夏普比率</span><b>{p.sharpe ?? "--"}</b></div>
               <div className="kv"><span>风险等级</span><b>{p.risk_level} / 5</b></div>
+              <div className="bar" style={{ marginTop: 8 }}><div style={{ width: `${Math.min(100, Math.max(0, (p.risk_level / 5) * 100))}%` }} /></div>
             </Link>
           ))}
         </div>

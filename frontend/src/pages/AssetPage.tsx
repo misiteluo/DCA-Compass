@@ -58,6 +58,12 @@ export default function AssetPage({ assetId }: { assetId?: string }) {
   const monthly = report.monthly_heatmap ?? (report.monthlyData?.length && Array.isArray(report.monthlyData[0])
     ? Object.fromEntries((report.monthlyData as number[][]).map((row, i) => [String(2015 + i), row])) : null);
   const final = (values?: number[]) => values?.[values.length - 1] ?? null;
+  // 将沪深300牛熊节点匹配到当前图表时间轴用于 markPoint 标注
+  const bullBearMarks = (report.bullBearNodes ?? []).flatMap((n) => {
+    const idx = points.findIndex((p) => p.date.slice(0, 7) === n.date.slice(0, 7));
+    if (idx < 0 || points[idx].price == null) return [];
+    return [{ name: n.label, value: n.label, coord: [points[idx].date, points[idx].price] }];
+  });
   return <main className="wrap">
     <section>
       <div className="card asset-head"><div>
@@ -100,11 +106,12 @@ export default function AssetPage({ assetId }: { assetId?: string }) {
         yAxis: [{ type: "value", name: "价格", scale: true }, { type: "value", name: "评分", min: 0, max: 100 }, { type: "value", name: "倍数", position: "right", offset: 45, min: 0, max: 3 }],
         dataZoom: [{ type: "inside" }, { type: "slider", bottom: 0 }],
         series: [
-          { name: "价格", type: "line", data: points.map((p) => p.price), showSymbol: false, yAxisIndex: 0 },
+          { name: "价格", type: "line", data: points.map((p) => p.price), showSymbol: false, yAxisIndex: 0, ...(bullBearMarks.length ? { markPoint: { symbolSize: 36, label: { fontSize: 10 }, data: bullBearMarks } } : {}) },
           { name: "评分", type: "line", data: points.map((p) => p.score), showSymbol: false, yAxisIndex: 1 },
           { name: "定投倍数", type: "line", data: points.map((p) => p.multiplier), showSymbol: false, yAxisIndex: 2 },
         ],
       }} /></div>
+      {!!report.bullBearNodes?.length && <div className="card" style={{ marginTop: 12 }}><h3>历史牛熊关键节点</h3><div className="toolbar">{report.bullBearNodes.map((n) => <span key={n.date} className="btn" style={{ cursor: "default" }}>{n.date} · {n.label}（{n.score}分）</span>)}</div></div>}
       <SourceNote source={a.history_source} />
       <div className="table-scroll" tabIndex={0} role="region" aria-label="评分历史明细"><table><thead><tr><th>日期</th><th>价格</th><th>评分</th><th>倍数</th>{historyColumns.map(([key, label]) => <th scope="col" key={key}>{label}</th>)}</tr></thead>
         <tbody>{records.map((r) => <tr key={r.date}><td>{r.date}</td><td>{fmt(r.price)}</td><td>{fmt(r.score)}</td><td>{r.multiplier == null ? "--" : `${fmt(r.multiplier)}x`}</td>{historyColumns.map(([key]) => {
